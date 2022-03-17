@@ -36,6 +36,47 @@ def load_data(file_name):
 
     return t, features, linear_velocity, angular_velocity, K, b, imu_T_cam
 
+def compare_trjectory(trajectory1, trajectory2, path1_name="Unknown1", path2_name="Unknown2", show_ori=False, features1=None, features2=None, save_name="Comparison" ):
+    fig, ax = plt.subplots(figsize=(5, 5))
+    n_pose = trajectory1.shape[2]
+    ax.plot(trajectory1[0, 3, :], trajectory1[1, 3, :], 'r-', label=path1_name)
+    ax.scatter(trajectory1[0, 3, 0], trajectory1[1, 3, 0], marker='s', label="Start_LAM")
+    ax.scatter(trajectory1[0, 3, -1], trajectory1[1, 3, -1], marker='o', label="End_LAM")
+
+    ax.plot(trajectory2[0, 3, :], trajectory2[1, 3, :], 'b-', label=path2_name)
+    ax.scatter(trajectory2[0, 3, 0], trajectory2[1, 3, 0], marker='s', label="Start_SLAM")
+    ax.scatter(trajectory2[0, 3, -1], trajectory2[1, 3, -1], marker='o', label="End_SLAM")
+
+    if features1 is not None:
+        ax.scatter(features1[0, :], features1[1, :], s=3, label="landmarks1")
+
+    if features2 is not None:
+        ax.scatter(features2[0, :], features2[1, :], s=3, label="landmarks2")
+
+    if show_ori:
+        select_ori_index = list(range(0, n_pose, max(int(n_pose / 50), 1)))
+        yaw_list = []
+
+        for i in select_ori_index:
+            _, _, yaw = mat2euler(trajectory1[:3, :3, i])
+            yaw_list.append(yaw)
+
+        dx = np.cos(yaw_list)
+        dy = np.sin(yaw_list)
+        dx, dy = [dx, dy] / np.sqrt(dx ** 2 + dy ** 2)
+        ax.quiver(trajectory1[0, 3, select_ori_index], trajectory1[1, 3, select_ori_index], dx, dy, \
+                  color="b", units="xy", width=1)
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.axis('equal')
+    ax.grid(False)
+    ax.legend()
+    plt.savefig(save_name+".png")
+    plt.show(block=True)
+
+    return fig, ax
+
 
 def visualize_trajectory_2d(pose, path_name="Unknown", show_ori=False, features=None):
     '''
@@ -73,6 +114,7 @@ def visualize_trajectory_2d(pose, path_name="Unknown", show_ori=False, features=
     ax.axis('equal')
     ax.grid(False)
     ax.legend()
+    plt.savefig(path_name+".png")
     plt.show(block=True)
 
     return fig, ax
@@ -101,7 +143,8 @@ def build_skew(x):
                          [-x[1], x[0], 0]])
 
 
-def build_twist(omega_hat, v):
+def build_twist(omega, v):
+    omega_hat = build_skew(omega)
     temp_pose = np.hstack((omega_hat, v))
     temp_pose = np.vstack((temp_pose, [0, 0, 0, 0]))
     return temp_pose
@@ -113,26 +156,22 @@ def build_pose(rotation, pose):
     return temp_pose
 
 
-# def predict(in_delta_t, omega_t, v_t, old_pose, old_variance):
-#     angular_velocity_t = build_skew(omega_t)
-#     linear_velocity_t = v_t[:, np.newaxis]
-#     pose_hat = build_pose_hat(angular_velocity_t, linear_velocity_t)
-#     pose_curve_hat = build_curve_hat(angular_velocity_t, build_skew(linear_velocity_t))
-#     new_mean = old_pose @ scipy.linalg.expm(in_delta_t * pose_hat)
-#     new_variance = scipy.linalg.expm(-in_delta_t * pose_curve_hat) @ old_variance @ scipy.linalg.expm(-in_delta_t * pose_curve_hat)
-#     return new_mean, new_variance
-
-
-def build_curly_hat(omega_hat, v_hat):
+def build_curly_hat(omega, v):
+    omega_hat = build_skew(omega)
+    v_hat = build_skew(v)
     val_1 = np.hstack((omega_hat, v_hat))
     val_2 = np.hstack((np.zeros_like(omega_hat), omega_hat))
     val = np.vstack((val_1, val_2))
     return val
 
 
-def predict_features(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
+def convert_to_pixel(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
     feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
-    optical_frame = cam_T_imu @ imu_T_world @ feature_poses
+
+    imu_coord = imu_T_world @ feature_poses
+    # imu_coord[2,0] = -imu_coord[2,0]
+    optical_frame = cam_T_imu @ imu_coord
+
     stereo_coord = projection_matrix @ (optical_frame / optical_frame[2, :])
     return stereo_coord
 
@@ -140,7 +179,11 @@ def predict_features(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
 def get_h_matrix(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
     P = np.vstack((np.identity(3), np.zeros((1, 3))))
     feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
-    optical_frame = cam_T_imu @ imu_T_world @ feature_poses
+
+    imu_coord = imu_T_world @ feature_poses
+    # imu_coord[2,0] = -imu_coord[2,0]
+    optical_frame = cam_T_imu @ imu_coord
+
     d_pi = d_canonical(optical_frame)
     h = projection_matrix @ d_pi @ cam_T_imu @ imu_T_world @ P
     return h
@@ -172,3 +215,22 @@ def convert_to_worldframe(k_s, cam_T_imu, imu_T_world, pixel):
 
     m = (world_T_imu @ imu_T_cam @ np.array([x, y, z, 1]).reshape([4, 1]))[:3, :]
     return m
+
+
+def get_pose_h_matrix(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
+
+    feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
+
+    imu_coord = imu_T_world @ feature_poses
+    # imu_coord[2,0] = -imu_coord[2,0]
+    optical_frame = cam_T_imu @ imu_coord
+
+    d_pi = d_canonical(optical_frame)
+
+    s_hat = build_skew(imu_coord[:3])
+    s_dot = np.hstack((np.identity(3),-s_hat))
+    s_dot = np.vstack((s_dot, np.zeros((1,s_dot.shape[1]))))
+
+    h = projection_matrix @ d_pi @ cam_T_imu @ s_dot
+
+    return -h
