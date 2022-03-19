@@ -30,5 +30,5 @@ if __name__ == '__main__':
     visualize_trajectory_2d(trajectory, path_name="Path_10", show_ori=True, features=landmarks)
     visualize_trajectory_2d(trajectory_v, path_name="Path_10", show_ori=True, features=landmarks_v)
 
-    compare_trjectory(trajectory, trajectory_v, path1_name="LAM", path2_name="SLAM", show_ori=False, save_name="feat")
-    compare_trjectory(trajectory, trajectory_v, path1_name="LAM", path2_name="SLAM", show_ori=False, features1=landmarks, features2=landmarks_v, save_name="no_feat")
+    compare_trajectory(trajectory, trajectory_v, path1_name="LAM", path2_name="SLAM", show_ori=False, save_name="feat")
+    compare_trajectory(trajectory, trajectory_v, path1_name="LAM", path2_name="SLAM", show_ori=False, features1=landmarks, features2=landmarks_v, save_name="no_feat")

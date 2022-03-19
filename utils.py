@@ -36,7 +36,7 @@ def load_data(file_name):
     return t, features, linear_velocity, angular_velocity, K, b, imu_T_cam
 
 
-def compare_trjectory(trajectory1, trajectory2, path1_name="Unknown1", path2_name="Unknown2", show_ori=False, features1=None, features2=None, save_name="Comparison"):
+def compare_trajectory(trajectory1, trajectory2, path1_name="Unknown1", path2_name="Unknown2", show_ori=False, features1=None, features2=None, save_name="Comparison"):
     fig, ax = plt.subplots(figsize=(5, 5))
     n_pose = trajectory1.shape[2]
     ax.plot(trajectory1[0, 3, :], trajectory1[1, 3, :], 'r-', label=path1_name)
