@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.linalg
 from transforms3d.euler import mat2euler
 
 
@@ -36,7 +35,8 @@ def load_data(file_name):
 
     return t, features, linear_velocity, angular_velocity, K, b, imu_T_cam
 
-def compare_trjectory(trajectory1, trajectory2, path1_name="Unknown1", path2_name="Unknown2", show_ori=False, features1=None, features2=None, save_name="Comparison" ):
+
+def compare_trjectory(trajectory1, trajectory2, path1_name="Unknown1", path2_name="Unknown2", show_ori=False, features1=None, features2=None, save_name="Comparison"):
     fig, ax = plt.subplots(figsize=(5, 5))
     n_pose = trajectory1.shape[2]
     ax.plot(trajectory1[0, 3, :], trajectory1[1, 3, :], 'r-', label=path1_name)
@@ -72,7 +72,7 @@ def compare_trjectory(trajectory1, trajectory2, path1_name="Unknown1", path2_nam
     ax.axis('equal')
     ax.grid(False)
     ax.legend()
-    plt.savefig(save_name+".png")
+    plt.savefig(save_name + ".png")
     plt.show(block=True)
 
     return fig, ax
@@ -114,7 +114,7 @@ def visualize_trajectory_2d(pose, path_name="Unknown", show_ori=False, features=
     ax.axis('equal')
     ax.grid(False)
     ax.legend()
-    plt.savefig(path_name+".png")
+    plt.savefig(path_name + ".png")
     plt.show(block=True)
 
     return fig, ax
@@ -169,7 +169,6 @@ def convert_to_pixel(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
     feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
 
     imu_coord = imu_T_world @ feature_poses
-    # imu_coord[2,0] = -imu_coord[2,0]
     optical_frame = cam_T_imu @ imu_coord
 
     stereo_coord = projection_matrix @ (optical_frame / optical_frame[2, :])
@@ -181,7 +180,6 @@ def get_h_matrix(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
     feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
 
     imu_coord = imu_T_world @ feature_poses
-    # imu_coord[2,0] = -imu_coord[2,0]
     optical_frame = cam_T_imu @ imu_coord
 
     d_pi = d_canonical(optical_frame)
@@ -218,18 +216,16 @@ def convert_to_worldframe(k_s, cam_T_imu, imu_T_world, pixel):
 
 
 def get_pose_h_matrix(projection_matrix, cam_T_imu, imu_T_world, feature_poses):
-
     feature_poses = np.vstack((feature_poses, np.ones((1, feature_poses.shape[1]))))
 
     imu_coord = imu_T_world @ feature_poses
-    # imu_coord[2,0] = -imu_coord[2,0]
     optical_frame = cam_T_imu @ imu_coord
 
     d_pi = d_canonical(optical_frame)
 
     s_hat = build_skew(imu_coord[:3])
-    s_dot = np.hstack((np.identity(3),-s_hat))
-    s_dot = np.vstack((s_dot, np.zeros((1,s_dot.shape[1]))))
+    s_dot = np.hstack((np.identity(3), -s_hat))
+    s_dot = np.vstack((s_dot, np.zeros((1, s_dot.shape[1]))))
 
     h = projection_matrix @ d_pi @ cam_T_imu @ s_dot
 
